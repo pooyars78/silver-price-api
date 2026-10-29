@@ -47,7 +47,7 @@ function chooseCandidate(posts, type) {
     const post = normalizeDigits(originalPost);
     if (type === 'fx') {
       if (!/دلار تهران|قیمت دلار|دلار/.test(post)) continue;
-      const amount = [...post.matchAll(/(?:\\d{1,3}(?:,\\d{3})+|\\d{4,9})/g)]
+      const amount = [...post.matchAll(/(?:\d{1,3}(?:,\d{3})+|\d{4,9})/g)]
         .map(m => Number(m[0].replace(/,/g, '')))
         .find(n => n >= 1000 && n <= 2000000);
       if (amount) return { value: amount, context: originalPost.slice(0, 500) };
@@ -56,7 +56,7 @@ function chooseCandidate(posts, type) {
 
     const hasSilver = /نقره|ساچمه/.test(post);
     if (!hasSilver) continue;
-    const lines = post.split(/\\n+/).map(line => line.trim()).filter(Boolean);
+    const lines = post.split(/\n+/).map(line => line.trim()).filter(Boolean);
     // Prefer an explicit 995 granule price per gram.
     let line = lines.find(x => /هر گرم/.test(x) && /ساچمه/.test(x) && /995|۹۹۵/.test(x));
     if (!line) line = lines.find(x => /قیمت هر گرم نقره ساچمه/.test(x));
@@ -64,7 +64,7 @@ function chooseCandidate(posts, type) {
       line = lines.find(x => /هر گرم/.test(x) && /ساچمه/.test(x));
     }
     if (!line) continue;
-    const currencyMatch = line.match(/((?:\\d{1,3}(?:,\\d{3})+|\\d{4,9}))\\s*(?:تومان|تومن|ریال)/);
+    const currencyMatch = line.match(/((?:\d{1,3}(?:,\d{3})+|\d{4,9}))\s*(?:تومان|تومن|ریال)/);
     if (currencyMatch) {
       const value = Number(currencyMatch[1].replace(/,/g, ''));
       if (value >= 100 && value <= 1000000000) {
@@ -72,7 +72,7 @@ function chooseCandidate(posts, type) {
       }
     }
     // Some posts put the purity label on the next line and omit currency on the price line.
-    const fallback = line.match(/(?:\\d{1,3}(?:,\\d{3})+|\\d{4,9})/);
+    const fallback = line.match(/(?:\d{1,3}(?:,\d{3})+|\d{4,9})/);
     if (fallback) {
       const value = Number(fallback[0].replace(/,/g, ''));
       if (value >= 100 && value <= 1000000000) {
