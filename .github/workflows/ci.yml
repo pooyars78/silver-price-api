@@ -23,4 +23,6 @@ jobs:
       - name: Install dependencies
         run: npm install --package-lock=false
       - name: Check JavaScript syntax
-        run: node --check index.js
+        run: |
+          node --check index.js
+          node --check scripts/daily-report.js
