@@ -6,7 +6,6 @@ const SOURCES = {
 };
 const OUNCE_GRAMS = 31.1034768;
 const PURITY = Number(process.env.SILVER_PURITY || '0.995');
-const IRR_PER_TOMAN = Number(process.env.IRR_PER_TOMAN || '10');
 
 function decodeHtml(s) {
   return s.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"')
@@ -146,12 +145,12 @@ async function main() {
     (report.sources.silverFallback && report.sources.silverFallback.extracted);
   if (Number.isFinite(spot) && fx && Number.isFinite(fx.value) && !fx.ambiguous &&
       silver && Number.isFinite(silver.value) && !silver.ambiguous) {
-    const theoreticalTomanPerGram = (spot * fx.value / OUNCE_GRAMS) * PURITY / IRR_PER_TOMAN;
+    const theoreticalTomanPerGram = (spot * fx.value / OUNCE_GRAMS) * PURITY;
     const marketTomanPerGram = silver.value;
     const premiumPct = ((marketTomanPerGram - theoreticalTomanPerGram) / theoreticalTomanPerGram) * 100;
     report.calculation = {
       convention: 'PROVISIONAL: FX and silver price units must be verified before relying on this result',
-      purity: PURITY, ounceGrams: OUNCE_GRAMS, irrPerToman: IRR_PER_TOMAN,
+      purity: PURITY, ounceGrams: OUNCE_GRAMS,
       theoreticalTomanPerGram: Number(theoreticalTomanPerGram.toFixed(2)),
       observedMarketTomanPerGram: marketTomanPerGram,
       premiumDiscountPercent: Number(premiumPct.toFixed(2)),
