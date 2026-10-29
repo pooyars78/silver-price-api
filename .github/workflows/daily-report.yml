@@ -24,7 +24,6 @@ jobs:
       - name: Collect prices and build report
         env:
           SILVER_PURITY: '0.995'
-          IRR_PER_TOMAN: '10'
           ENABLE_THREADS_PUBLISH: ${{ vars.ENABLE_THREADS_PUBLISH }}
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
