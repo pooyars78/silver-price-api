@@ -117,6 +117,10 @@ async function fetchTradingViewSilver() {
   throw new Error(lastError);
 }
 async function publishThreads(report) {
+  if (process.env.GITHUB_EVENT_NAME === 'push') {
+    console.log('Threads publishing skipped on push-triggered validation runs.');
+    return;
+  }
   if (process.env.ENABLE_THREADS_PUBLISH !== 'true') {
     console.log('Threads publishing disabled by default; set ENABLE_THREADS_PUBLISH=true only after validating price parsing and units.');
     return;
