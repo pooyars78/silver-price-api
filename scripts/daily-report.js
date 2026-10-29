@@ -77,6 +77,10 @@ async function fetchTradingViewSilver() {
   return { price, symbol: row.s, description: row.d[2] || null, method: 'TradingView scanner (undocumented endpoint)' };
 }
 async function publishThreads(report) {
+  if (process.env.ENABLE_THREADS_PUBLISH !== 'true') {
+    console.log('Threads publishing disabled by default; set ENABLE_THREADS_PUBLISH=true only after validating price parsing and units.');
+    return;
+  }
   const token = process.env.THREADS_ACCESS_TOKEN;
   const userId = process.env.THREADS_USER_ID;
   if (!token || !userId) {
