@@ -41,39 +41,79 @@ function numericCandidates(text) {
   return matches.map(m => ({ value: Number(m[0].replace(/,/g, '')) })).filter(x => Number.isFinite(x.value));
 }
 function chooseCandidate(posts, type) {
-  const patterns = type === 'fx' ? [/دلار/, /usd/i, /تومان/, /نرخ ارز/] : [/نقره/, /گرانول/, /گرم/, /۹۹۵/, /995/, /عیار/];
-  const all = [];
-  for (const post of posts) {
-    const norm = normalizeDigits(post);
-    if (!patterns.some(p => p.test(norm))) continue;
-    for (const candidate of numericCandidates(norm)) {
-      if (type === 'fx' && candidate.value >= 1000 && candidate.value <= 2000000)
-        all.push({ value: candidate.value, context: post.slice(0, 500) });
-      else if (type === 'silver' && candidate.value >= 100 && candidate.value <= 1000000000)
-        all.push({ value: candidate.value, context: post.slice(0, 500) });
+  // Telegram's public preview lists newest posts first. Use the newest relevant
+  // post and its labeled price, not unrelated numbers from the channel history.
+  for (const originalPost of posts) {
+    const post = normalizeDigits(originalPost);
+    if (type === 'fx') {
+      if (!/دلار تهران|قیمت دلار|دلار/.test(post)) continue;
+      const amount = [...post.matchAll(/(?:\\d{1,3}(?:,\\d{3})+|\\d{4,9})/g)]
+        .map(m => Number(m[0].replace(/,/g, '')))
+        .find(n => n >= 1000 && n <= 2000000);
+      if (amount) return { value: amount, context: originalPost.slice(0, 500) };
+      continue;
+    }
+
+    const hasSilver = /نقره|ساچمه/.test(post);
+    if (!hasSilver) continue;
+    const lines = post.split(/\\n+/).map(line => line.trim()).filter(Boolean);
+    // Prefer an explicit 995 granule price per gram.
+    let line = lines.find(x => /هر گرم/.test(x) && /ساچمه/.test(x) && /995|۹۹۵/.test(x));
+    if (!line) line = lines.find(x => /قیمت هر گرم نقره ساچمه/.test(x));
+    if (!line && /ساچمه/.test(post) && /995|۹۹۵/.test(post)) {
+      line = lines.find(x => /هر گرم/.test(x) && /ساچمه/.test(x));
+    }
+    if (!line) continue;
+    const currencyMatch = line.match(/((?:\\d{1,3}(?:,\\d{3})+|\\d{4,9}))\\s*(?:تومان|تومن|ریال)/);
+    if (currencyMatch) {
+      const value = Number(currencyMatch[1].replace(/,/g, ''));
+      if (value >= 100 && value <= 1000000000) {
+        return { value, context: originalPost.slice(0, 500), matchedLine: line };
+      }
+    }
+    // Some posts put the purity label on the next line and omit currency on the price line.
+    const fallback = line.match(/(?:\\d{1,3}(?:,\\d{3})+|\\d{4,9})/);
+    if (fallback) {
+      const value = Number(fallback[0].replace(/,/g, ''));
+      if (value >= 100 && value <= 1000000000) {
+        return { value, context: originalPost.slice(0, 500), matchedLine: line, unitNeedsVerification: true };
+      }
     }
   }
-  if (!all.length) return null;
-  const unique = [...new Map(all.map(x => [x.value, x])).values()];
-  if (unique.length !== 1) return { ambiguous: true, candidates: unique.slice(0, 12) };
-  return unique[0];
+  return null;
 }
 async function fetchTradingViewSilver() {
-  const response = await fetch('https://scanner.tradingview.com/america/scan', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'user-agent': 'Mozilla/5.0' },
-    body: JSON.stringify({
-      symbols: { tickers: ['TVC:SILVER'], query: { types: [] } },
-      columns: ['close', 'name', 'description', 'update_mode'],
-    }),
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!response.ok) throw new Error('TradingView scanner HTTP ' + response.status);
-  const data = await response.json();
-  const row = data && data.data && data.data.find(item => item && item.s === 'TVC:SILVER');
-  const price = Number(row && row.d && row.d[0]);
-  if (!Number.isFinite(price) || price <= 0) throw new Error('TVC:SILVER price not present in scanner response');
-  return { price, symbol: row.s, description: row.d[2] || null, method: 'TradingView scanner (undocumented endpoint)' };
+  // The endpoint is undocumented; try likely scanner regions without silently
+  // substituting a different symbol/provider.
+  const regions = ['global', 'cfd', 'america'];
+  let lastError = 'TVC:SILVER not returned by TradingView scanner';
+  for (const region of regions) {
+    try {
+      const response = await fetch('https://scanner.tradingview.com/' + region + '/scan', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'user-agent': 'Mozilla/5.0' },
+        body: JSON.stringify({
+          symbols: { tickers: ['TVC:SILVER'], query: { types: [] } },
+          columns: ['close', 'name', 'description', 'update_mode'],
+        }),
+        signal: AbortSignal.timeout(20000),
+      });
+      if (!response.ok) {
+        lastError = 'TradingView ' + region + ' scanner HTTP ' + response.status;
+        continue;
+      }
+      const data = await response.json();
+      const row = data && data.data && data.data.find(item => item && item.s === 'TVC:SILVER');
+      const price = Number(row && row.d && row.d[0]);
+      if (Number.isFinite(price) && price > 0) {
+        return { price, symbol: row.s, description: row.d[2] || null, method: 'TradingView scanner (undocumented endpoint)', region };
+      }
+      lastError = 'TVC:SILVER price not present in ' + region + ' scanner response';
+    } catch (e) {
+      lastError = e.message;
+    }
+  }
+  throw new Error(lastError);
 }
 async function publishThreads(report) {
   if (process.env.ENABLE_THREADS_PUBLISH !== 'true') {
