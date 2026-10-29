@@ -1,0 +1,37 @@
+name: Daily Silver Price Report
+
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Collect prices and build report
+        env:
+          SILVER_PURITY: '0.995'
+          IRR_PER_TOMAN: '10'
+          ENABLE_THREADS_PUBLISH: ${{ vars.ENABLE_THREADS_PUBLISH }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+        run: node scripts/daily-report.js
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-silver-report
+          path: output/
+          if-no-files-found: warn
+          retention-days: 30
