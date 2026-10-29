@@ -55,7 +55,8 @@ function chooseCandidate(posts, type) {
     }
 
     const hasSilver = /نقره|ساچمه/.test(post);
-    if (!hasSilver) continue;
+    const has995Purity = /995|۹۹۵/.test(post);
+    if (!hasSilver || !has995Purity) continue;
     const lines = post.split(/\n+/).map(line => line.trim()).filter(Boolean);
     // Prefer an explicit 995 granule price per gram.
     let line = lines.find(x => /هر گرم/.test(x) && /ساچمه/.test(x) && /995|۹۹۵/.test(x));
